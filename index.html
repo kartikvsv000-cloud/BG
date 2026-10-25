@@ -1,0 +1,373 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Number Pair Tracker</title>
+<style>
+:root{color-scheme:dark;--bg:#090909;--line:#343434;--text:#f5f5f5;--muted:#aaa;--blue:#54b7ff;--green:#00c878;--red:#ff6565;--gold:#ffd166}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,sans-serif}
+header{padding:22px 16px 14px;max-width:1100px;margin:auto}
+h1{font-size:clamp(25px,5vw,36px);margin:0 0 6px}
+h2{font-size:20px;margin:0 0 14px}
+p{color:var(--muted);margin:5px 0 0}
+main{max-width:1100px;margin:auto;padding:0 16px 40px;display:grid;gap:14px}
+.panel{border:1px solid var(--line);border-radius:18px;background:#0d0d0d;padding:16px}
+.digits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.digit,.pair,.btn{border:1px solid #414141;background:#101010;color:var(--text);border-radius:12px;padding:11px 8px;font-weight:700;cursor:pointer}
+.digit.active{background:#f5f5f5;color:#111}
+.pairgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:9px}
+.pair{background:#222;padding:12px 8px;text-align:center}
+.pair strong{font-size:25px;display:block}
+.pair small{font-size:13px}
+.big{color:var(--green)}.small{color:var(--blue)}
+.pair.selected{outline:2px solid var(--gold)}
+.muted{color:var(--muted)}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.field{display:grid;gap:6px;margin:10px 0}
+.field label{color:#ddd;font-size:14px}
+.field input,.field select{width:100%;padding:12px;background:#181818;border:1px solid #444;border-radius:10px;color:#fff;font:inherit}
+.btn{padding:12px 14px}
+.btn.primary{background:#f5f5f5;color:#111}
+.btn.red{border-color:#853737;color:#ff9999}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.stat{background:#1b1b1b;padding:12px;border-radius:12px}
+.stat span{display:block;color:var(--muted);font-size:12px}
+.stat strong{font-size:24px}
+.pill{display:inline-block;padding:4px 9px;border:1px solid #444;border-radius:99px;font-size:12px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:580px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #292929}
+th{color:#bbb}
+.empty{padding:18px;text-align:center;color:var(--muted)}
+.notice{font-size:13px;color:#aaa}
+.hidden{display:none!important}
+.sectionhead{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.status{font-weight:700}
+.status.win{color:var(--green)}.status.loss{color:var(--red)}
+@media(min-width:800px){
+main{grid-template-columns:1fr 1fr}
+.wide{grid-column:1/-1}
+.digits{grid-template-columns:repeat(10,minmax(0,1fr))}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>🎈 Number Pair Tracker</h1>
+<p>Select a digit, choose a pair, record predictions and actual BIG/SMALL results, and track streaks and history.</p>
+</header>
+
+<main>
+<section class="panel">
+<h2>1. Select starting digit</h2>
+<div id="digits" class="digits"></div>
+<p id="pairCount" class="muted"></p>
+</section>
+
+<section class="panel">
+<div class="sectionhead">
+<h2>2. Choose a pair</h2>
+<span id="selectedBadge" class="pill">No pair selected</span>
+</div>
+<div id="pairs" class="pairgrid"></div>
+<p class="notice">Only the predefined 37 pairs are included.</p>
+</section>
+
+<section class="panel">
+<h2>3. Record a level</h2>
+<div id="noPair" class="empty">Select a pair above first.</div>
+<form id="recordForm" class="hidden">
+<div class="row">
+<div class="field">
+<label for="level">Level number</label>
+<input id="level" type="number" min="1" step="1" required>
+</div>
+<div class="field">
+<label for="predicted">System prediction</label>
+<select id="predicted">
+<option value="BIG">BIG</option>
+<option value="SMALL">SMALL</option>
+</select>
+</div>
+</div>
+<div class="field">
+<label for="actual">Actual result</label>
+<select id="actual">
+<option value="BIG">BIG</option>
+<option value="SMALL">SMALL</option>
+</select>
+</div>
+<div class="field">
+<label for="note">Optional note / round ID</label>
+<input id="note" maxlength="180" placeholder="Enter a note">
+</div>
+<div class="actions">
+<button class="btn primary" type="submit">Save level result</button>
+<button class="btn" type="button" id="nextLevel">Next level</button>
+</div>
+</form>
+</section>
+
+<section class="panel">
+<h2>Selected pair summary</h2>
+<div id="summary" class="empty">Choose a pair to see statistics.</div>
+</section>
+
+<section class="panel wide">
+<div class="sectionhead">
+<h2>Selected pair history</h2>
+<div class="actions">
+<button class="btn" id="exportPair">Export pair CSV</button>
+<button class="btn red" id="clearPair">Clear this pair</button>
+</div>
+</div>
+<div id="history" class="empty">No pair selected.</div>
+</section>
+
+<section class="panel wide">
+<div class="sectionhead">
+<h2>All saved records</h2>
+<div class="actions">
+<button class="btn" id="exportAll">Export all CSV</button>
+<button class="btn" id="backup">Download backup JSON</button>
+<label class="btn" for="restoreFile">Restore backup</label>
+<input id="restoreFile" type="file" accept=".json,application/json" class="hidden">
+<button class="btn red" id="clearAll">Clear all</button>
+</div>
+</div>
+<div id="allHistory" class="empty">No saved records yet.</div>
+</section>
+
+<section class="panel wide">
+<h2>How tracking works</h2>
+<p>WIN means predicted result matches actual result. Otherwise it is LOSS. Current consecutive win/loss streaks, longest streaks, total levels and win rate are calculated automatically.</p>
+<p class="notice">Data saves in this browser only. It does not automatically sync across phones or browsers. Past outcomes cannot guarantee future results.</p>
+</section>
+</main>
+
+<script>
+const PAIRS = [
+["00","SMALL"],["03","SMALL"],["04","BIG"],["07","BIG"],["08","SMALL"],
+["11","SMALL"],["14","BIG"],["18","SMALL"],["19","SMALL"],
+["21","BIG"],["24","SMALL"],["25","SMALL"],["27","SMALL"],["28","BIG"],
+["31","BIG"],["32","SMALL"],["35","SMALL"],["39","BIG"],
+["43","SMALL"],["48","BIG"],
+["56","SMALL"],["58","BIG"],["59","BIG"],
+["61","SMALL"],["62","SMALL"],["63","SMALL"],["66","BIG"],
+["75","BIG"],["79","BIG"],
+["84","BIG"],["85","BIG"],["86","BIG"],["89","SMALL"],
+["90","BIG"],["91","BIG"],["95","SMALL"],["99","BIG"]
+].map(([pair,label])=>({pair,label}));
+
+const STORAGE_KEY="numberPairTracker_v1";
+let data=loadData(),selectedDigit="0",selectedPair=null;
+
+function loadData(){
+ try{
+  const v=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");
+  return {records:Array.isArray(v.records)?v.records:[]};
+ }catch{return {records:[]};}
+}
+function save(){
+ try{
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  renderAll();
+ }catch(e){alert("Save failed. Export a backup and check browser storage.");}
+}
+function esc(s){
+ return String(s??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+function pairRows(){
+ return data.records.filter(r=>r.pair===selectedPair)
+ .sort((a,b)=>a.level-b.level||a.created-b.created);
+}
+function streakInfo(rows){
+ let cw=0,cl=0,bw=0,bl=0,prev=null;
+ for(const r of rows){
+  if(r.outcome==="WIN"){
+   cw=prev==="WIN"?cw+1:1;cl=0;bw=Math.max(bw,cw);
+  }else{
+   cl=prev==="LOSS"?cl+1:1;cw=0;bl=Math.max(bl,cl);
+  }
+  prev=r.outcome;
+ }
+ return {cw,cl,bw,bl};
+}
+function stats(rows){
+ const wins=rows.filter(r=>r.outcome==="WIN").length;
+ const losses=rows.length-wins;
+ return {n:rows.length,wins,losses,
+ rate:rows.length?(wins/rows.length*100).toFixed(1):"0.0",
+ ...streakInfo(rows)};
+}
+function renderDigits(){
+ document.getElementById("digits").innerHTML=
+ Array.from({length:10},(_,i)=>
+ `<button class="digit ${String(i)===selectedDigit?'active':''}" data-digit="${i}">${i}</button>`
+ ).join("");
+ document.querySelectorAll("[data-digit]").forEach(b=>b.onclick=()=>{
+  selectedDigit=b.dataset.digit;selectedPair=null;renderAll();
+ });
+}
+function renderPairs(){
+ const list=PAIRS.filter(p=>p.pair[0]===selectedDigit);
+ document.getElementById("pairCount").textContent=
+ `Pairs starting with ${selectedDigit}: ${list.length}`;
+ document.getElementById("pairs").innerHTML=list.map(p=>
+ `<button class="pair ${p.pair===selectedPair?'selected':''}" data-pair="${p.pair}">
+ <strong>${p.pair}</strong><small class="${p.label.toLowerCase()}">${p.label}</small></button>`
+ ).join("");
+ document.querySelectorAll("[data-pair]").forEach(b=>b.onclick=()=>{
+  selectedPair=b.dataset.pair;renderAll();
+ });
+ document.getElementById("selectedBadge").textContent=selectedPair?
+ `${selectedPair} · ${PAIRS.find(p=>p.pair===selectedPair).label}`:"No pair selected";
+}
+function renderForm(){
+ const form=document.getElementById("recordForm");
+ document.getElementById("noPair").classList.toggle("hidden",!!selectedPair);
+ form.classList.toggle("hidden",!selectedPair);
+ if(selectedPair){
+  const rows=pairRows();
+  document.getElementById("level").value=
+   rows.reduce((m,r)=>Math.max(m,r.level),0)+1;
+  document.getElementById("predicted").value=
+   PAIRS.find(p=>p.pair===selectedPair).label;
+ }
+}
+function renderSummary(){
+ const el=document.getElementById("summary");
+ if(!selectedPair){
+  el.className="empty";el.textContent="Choose a pair to see its stats.";return;
+ }
+ const s=stats(pairRows());el.className="";
+ el.innerHTML=`<div class="stats">
+ <div class="stat"><span>Total levels</span><strong>${s.n}</strong></div>
+ <div class="stat"><span>Win rate</span><strong>${s.rate}%</strong></div>
+ <div class="stat"><span>Current streak</span><strong>${s.cw?s.cw+" WIN":s.cl?s.cl+" LOSS":"—"}</strong></div>
+ <div class="stat"><span>Wins / Losses</span><strong>${s.wins} / ${s.losses}</strong></div>
+ <div class="stat"><span>Longest win streak</span><strong>${s.bw}</strong></div>
+ <div class="stat"><span>Longest loss streak</span><strong>${s.bl}</strong></div>
+ </div>`;
+}
+function tableHTML(rows,withPair=false){
+ if(!rows.length)return '<div class="empty">No saved records for this view.</div>';
+ return `<div class="tablewrap"><table><thead><tr>
+ ${withPair?'<th>Pair</th>':''}<th>Level</th><th>Predicted</th>
+ <th>Actual</th><th>Outcome</th><th>Date / time</th><th>Note</th><th></th>
+ </tr></thead><tbody>${rows.map(r=>`<tr>
+ ${withPair?`<td><b>${r.pair}</b></td>`:''}
+ <td>${r.level}</td><td class="${r.predicted.toLowerCase()}">${r.predicted}</td>
+ <td class="${r.actual.toLowerCase()}">${r.actual}</td>
+ <td class="status ${r.outcome.toLowerCase()}">${r.outcome}</td>
+ <td>${new Date(r.created).toLocaleString()}</td><td>${esc(r.note)}</td>
+ <td><button class="btn" data-delete="${r.id}">Delete</button></td>
+ </tr>`).join("")}</tbody></table></div>`;
+}
+function wireDelete(){
+ document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{
+  if(confirm("Delete this saved level?")){
+   data.records=data.records.filter(r=>r.id!==b.dataset.delete);save();
+  }
+ });
+}
+function renderHistory(){
+ const rows=pairRows().sort((a,b)=>b.level-a.level||b.created-a.created);
+ document.getElementById("history").innerHTML=selectedPair?
+ tableHTML(rows):'<div class="empty">No pair selected.</div>';
+ document.getElementById("allHistory").innerHTML=
+ tableHTML([...data.records].sort((a,b)=>b.created-a.created),true);
+ wireDelete();
+}
+function renderAll(){
+ renderDigits();renderPairs();renderForm();renderSummary();renderHistory();
+}
+
+document.getElementById("recordForm").addEventListener("submit",e=>{
+ e.preventDefault();if(!selectedPair)return;
+ const level=Number(document.getElementById("level").value);
+ const predicted=document.getElementById("predicted").value;
+ const actual=document.getElementById("actual").value;
+ if(!Number.isInteger(level)||level<1)return alert("Enter a valid level.");
+ if(data.records.some(r=>r.pair===selectedPair&&r.level===level))
+  return alert("This pair already has this level. Choose another level or delete the old record.");
+ data.records.push({
+  id:crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random(),
+  pair:selectedPair,level,predicted,actual,
+  outcome:predicted===actual?"WIN":"LOSS",
+  note:document.getElementById("note").value.trim(),created:Date.now()
+ });
+ document.getElementById("note").value="";save();
+});
+document.getElementById("nextLevel").onclick=()=>{
+ document.getElementById("level").value=
+ Number(document.getElementById("level").value||0)+1;
+};
+
+function csv(rows,withPair){
+ const cols=[...(withPair?["pair"]:[]),"level","predicted","actual","outcome","created","note"];
+ const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+ return [cols.join(","),...rows.map(r=>cols.map(c=>
+ q(c==="created"?new Date(r[c]).toISOString():r[c])).join(","))].join("\r\n");
+}
+function download(name,content,type){
+ const a=document.createElement("a");
+ const url=URL.createObjectURL(new Blob([content],{type}));
+ a.href=url;a.download=name;a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+document.getElementById("exportPair").onclick=()=>{
+ if(!selectedPair)return alert("Select a pair first.");
+ download(`pair-${selectedPair}-history.csv`,csv(pairRows(),false),"text/csv;charset=utf-8");
+};
+document.getElementById("exportAll").onclick=()=>{
+ download("all-pair-history.csv",csv(data.records,true),"text/csv;charset=utf-8");
+};
+document.getElementById("backup").onclick=()=>{
+ download("number-pair-tracker-backup.json",
+ JSON.stringify({version:1,exportedAt:new Date().toISOString(),records:data.records},null,2),
+ "application/json");
+};
+document.getElementById("restoreFile").onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+  const v=JSON.parse(await f.text());
+  if(!v||!Array.isArray(v.records)||!v.records.every(r=>
+   r.pair&&Number.isInteger(Number(r.level))&&
+   ["BIG","SMALL"].includes(r.predicted)&&["BIG","SMALL"].includes(r.actual)))
+   throw Error("Invalid backup format");
+  if(!confirm(`Import ${v.records.length} records? Matching pair and level records will be replaced.`))return;
+  for(const r of v.records){
+   const rec={...r,id:r.id||String(Date.now())+Math.random(),
+    pair:String(r.pair),level:Number(r.level),
+    outcome:r.predicted===r.actual?"WIN":"LOSS",
+    created:Number(r.created)||Date.now(),note:String(r.note||"")};
+   data.records=data.records.filter(old=>!(old.pair===rec.pair&&old.level===rec.level));
+   data.records.push(rec);
+  }
+  save();alert("Backup imported.");
+ }catch(err){alert("Restore failed: "+err.message);}
+ finally{e.target.value="";}
+};
+document.getElementById("clearPair").onclick=()=>{
+ if(!selectedPair)return alert("Select a pair first.");
+ if(confirm(`Delete all history for pair ${selectedPair}?`)){
+  data.records=data.records.filter(r=>r.pair!==selectedPair);save();
+ }
+};
+document.getElementById("clearAll").onclick=()=>{
+ if(confirm("Delete ALL saved records? Download a backup first if needed.")){
+  data.records=[];save();
+ }
+};
+renderAll();
+</script>
+</body>
+</html>
